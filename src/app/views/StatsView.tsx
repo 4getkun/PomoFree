@@ -17,11 +17,18 @@ const RANGE_LABEL: Record<RangeMode, string> = { daily: "日別", weekly: "週�
 
 function formatMinutes(rawTotal: number): string {
   // Session durations can now be fractional minutes (pause-time flushing —
-  // see timer.ts — records down to the second, e.g. 2 seconds = 0.0333...
-  // minutes), so this always rounds to a whole minute before splitting into
-  // hours/minutes — otherwise a raw float like "0.0833...分" would leak
-  // into the UI instead of a clean "5秒" — worthy of note but out of scope;
-  // rounding to the nearest whole minute keeps this display simple.
+  // see timer.ts — records down to the second, e.g. 20 seconds = 0.333...
+  // minutes). Rounding straight to a whole minute made anything under 30
+  // seconds display as a flat, misleading "0分" — real recorded time that
+  // looked like it hadn't been recorded at all. Below one minute this shows
+  // seconds instead, so a few seconds of paused work still reads as real
+  // (e.g. "20秒") rather than nothing; at or above one minute it falls back
+  // to the original whole-minute/hour display, since second-level
+  // granularity stops being useful once a session runs that long.
+  const totalSeconds = Math.round(rawTotal * 60);
+  if (totalSeconds < 60) {
+    return totalSeconds <= 0 ? "0分" : `${totalSeconds}秒`;
+  }
   const total = Math.round(rawTotal);
   const h = Math.floor(total / 60);
   const m = total % 60;
