@@ -90,6 +90,9 @@ export default function TasksView({
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
           プロジェクトとタスクの数に制限はありません。全部無料です。
         </p>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+          プロジェクトはタスクをまとめるための任意のグループです。下のタスク追加フォームで「詳細」を開くとプロジェクトを選べますが、設定しなくてもタスクは追加できます。
+        </p>
       </div>
 
       <ProjectManager

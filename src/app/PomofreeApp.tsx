@@ -144,6 +144,27 @@ export default function PomofreeApp() {
   });
   const { phase, status, remainingMs } = timer;
 
+  // Chime on every user-driven transition, not just natural phase
+  // completion: start (including the "resume" case — same button/handler),
+  // and pause. Phase-end already chimes via handlePhaseEnd above, which
+  // covers both "work session ends" and "break ends" (and, when
+  // autoStartWork/autoStartBreaks is on, the automatic restart that follows
+  // is the same instant as that same chime — no separate sound needed
+  // there). timer.start/timer.pause are stable across renders (useCallback
+  // with no deps inside useTimerEngine), so these wrappers stay stable too
+  // except when the volume setting changes.
+  const handleTimerStart = useCallback(() => {
+    playChime(settings.soundVolume);
+    timer.start();
+  }, [timer.start, settings.soundVolume]);
+
+  const handleTimerPause = useCallback(() => {
+    playChime(settings.soundVolume);
+    timer.pause();
+  }, [timer.pause, settings.soundVolume]);
+
+  const timerForView = { ...timer, start: handleTimerStart, pause: handleTimerPause, resume: handleTimerStart };
+
   const originalTitleRef = useRef<string | null>(null);
 
   // One ambient-sound engine for the whole app lifetime (was previously
@@ -212,7 +233,14 @@ export default function PomofreeApp() {
   return (
     <div className="flex min-h-screen flex-col md:flex-row" style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}>
       <nav
-        className="order-2 flex shrink-0 justify-around border-t px-2 py-2 md:order-1 md:w-56 md:flex-col md:justify-start md:gap-1 md:border-t-0 md:border-r md:px-3 md:py-6"
+        // md:self-start overrides the flex row's default align-items:stretch,
+        // which otherwise stretches this sidebar to match <main>'s height —
+        // most visible on the Settings tab (the tallest page), where the
+        // nav's background would visibly balloon far past its own content.
+        // md:sticky md:top-0 keeps it pinned near the top of the viewport
+        // while a long page scrolls, instead of just sitting short at the
+        // very top and scrolling out of view.
+        className="order-2 flex shrink-0 justify-around border-t px-2 py-2 md:order-1 md:sticky md:top-0 md:w-56 md:flex-col md:items-stretch md:self-start md:justify-start md:gap-1 md:border-t-0 md:border-r md:px-3 md:py-6"
         style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         aria-label="メインナビゲーション"
       >
@@ -255,7 +283,7 @@ export default function PomofreeApp() {
               activeTaskId={activeTaskId}
               setActiveTaskId={setActiveTaskId}
               tasks={tasks.tasks}
-              timer={timer}
+              timer={timerForView}
             />
           )}
           {activeView === "tasks" && (

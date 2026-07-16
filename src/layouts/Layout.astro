@@ -5,12 +5,29 @@ import { BASE_URL } from "../app/lib/base";
 interface Props {
   title: string;
   description?: string;
+  /** Path relative to BASE_URL, e.g. "og-image.png". Must be a real file in
+   * public/ — X/Twitter (and other link-preview crawlers) require an
+   * ABSOLUTE image URL, which is why this gets resolved against
+   * Astro.site below rather than used as-is. */
+  image?: string;
+  /** Path relative to BASE_URL for this page's canonical/og:url, e.g. ""
+   * for the landing page or "app/" for the app page. */
+  url?: string;
 }
 
 const {
   title,
   description = "Pomofree is a free, no-account, no-ads Pomodoro focus timer with unlimited stats, cross-device sync, ambient sounds, themes, and fully custom timer durations.",
+  image = "og-image.png",
+  url = "",
 } = Astro.props;
+
+// Astro.site is the origin only ("https://4getkun.github.io/"), so BASE_URL
+// (which already carries the "/PomoFree/" repo-name prefix) has to be
+// folded in here to get the real absolute URL — see astro.config.mjs's
+// base-path comment for why that prefix exists at all.
+const ogImageAbsoluteUrl = new URL(`${BASE_URL}${image}`, Astro.site).toString();
+const canonicalAbsoluteUrl = new URL(`${BASE_URL}${url}`, Astro.site).toString();
 ---
 
 <!doctype html>
@@ -22,6 +39,26 @@ const {
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
+    <link rel="canonical" href={canonicalAbsoluteUrl} />
+
+    <!-- Open Graph (used by X/Twitter as a fallback, and by
+         Facebook/LINE/Discord/Slack link previews) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Pomofree" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalAbsoluteUrl} />
+    <meta property="og:image" content={ogImageAbsoluteUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- X/Twitter Card. summary_large_image is what makes X render the
+         full-width image card instead of a small thumbnail. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageAbsoluteUrl} />
     <script is:inline>
       // Applied before first paint to avoid a flash of the wrong theme.
       // Mirrors the logic in src/app/lib/useSettings.ts — kept inline (not
