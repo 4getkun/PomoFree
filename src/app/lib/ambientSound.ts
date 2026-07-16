@@ -99,10 +99,14 @@ function buildGraph(ctx: AudioContext, soundId: AmbientSoundId, masterGain: Gain
   const cleanupFns: (() => void)[] = [];
   let sources: AudioBufferSourceNode[] = [];
 
+  // Every AudioBufferSourceNode must have .start() called or it silently
+  // produces no output at all — easy to miss since connect() alone doesn't
+  // error. Centralizing the .start() call here (instead of leaving it to
+  // each call site) means every case gets it for free.
   const startSource = (): AudioBufferSourceNode => {
     const src = makeNoiseSource(ctx, noiseBuffer);
     sources.push(src);
-    src.start(); 
+    src.start();
     return src;
   };
 
@@ -111,7 +115,6 @@ function buildGraph(ctx: AudioContext, soundId: AmbientSoundId, masterGain: Gain
       // Plain broadband noise, no filtering.
       const src = startSource();
       src.connect(masterGain);
-      src.start();
       break;
     }
     case "rain": {
