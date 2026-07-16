@@ -233,14 +233,15 @@ export default function PomofreeApp() {
   return (
     <div className="flex min-h-screen flex-col md:flex-row" style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}>
       <nav
-        // md:self-start overrides the flex row's default align-items:stretch,
-        // which otherwise stretches this sidebar to match <main>'s height —
-        // most visible on the Settings tab (the tallest page), where the
-        // nav's background would visibly balloon far past its own content.
-        // md:sticky md:top-0 keeps it pinned near the top of the viewport
-        // while a long page scrolls, instead of just sitting short at the
-        // very top and scrolling out of view.
-        className="order-2 flex shrink-0 justify-around border-t px-2 py-2 md:order-1 md:sticky md:top-0 md:w-56 md:flex-col md:items-stretch md:self-start md:justify-start md:gap-1 md:border-t-0 md:border-r md:px-3 md:py-6"
+        // The flex row's default align-items:stretch used to make this
+        // sidebar match <main>'s height exactly — fine on short pages, but
+        // on a page taller than one viewport (e.g. Settings) it made the
+        // sidebar balloon past the viewport too. md:h-screen instead pins
+        // it to exactly one viewport height always (so it still fills the
+        // screen edge-to-edge on short pages, matching the original look),
+        // and md:sticky md:top-0 keeps that fixed-height sidebar pinned in
+        // view while a taller page scrolls past it.
+        className="order-2 flex shrink-0 justify-around border-t px-2 py-2 md:order-1 md:sticky md:top-0 md:h-screen md:w-56 md:flex-col md:justify-start md:gap-1 md:border-t-0 md:border-r md:px-3 md:py-6"
         style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
         aria-label="メインナビゲーション"
       >
