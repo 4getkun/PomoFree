@@ -494,8 +494,17 @@ function ToggleRow({
         style={{ backgroundColor: checked ? "var(--accent)" : "var(--border)" }}
       >
         <span
-          className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-          style={{ transform: checked ? "translateX(22px)" : "translateX(2px)" }}
+          // `left-0.5` must be set explicitly alongside `top-0.5` — without
+          // it, `left` falls back to the browser's resolved "static
+          // position" for this absolutely-positioned span (a non-zero,
+          // browser-computed value, not simply 0) instead of the track's
+          // left edge. That resolved offset then stacks with the
+          // translateX() below (transform is a separate, additive paint-
+          // time offset on top of the box's positioned location), pushing
+          // the knob outside the track — exactly the overflow bug this
+          // fixes.
+          className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
+          style={{ transform: checked ? "translateX(20px)" : "translateX(0px)" }}
         />
       </button>
     </div>
