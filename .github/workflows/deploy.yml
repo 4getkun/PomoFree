@@ -18,7 +18,7 @@ name: Build and deploy to GitHub Pages
 #  (README参照)。
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:

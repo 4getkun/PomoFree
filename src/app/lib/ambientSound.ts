@@ -102,6 +102,7 @@ function buildGraph(ctx: AudioContext, soundId: AmbientSoundId, masterGain: Gain
   const startSource = (): AudioBufferSourceNode => {
     const src = makeNoiseSource(ctx, noiseBuffer);
     sources.push(src);
+    src.start(); 
     return src;
   };
 
