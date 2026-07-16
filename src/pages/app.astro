@@ -1,0 +1,10 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PomofreeApp from "../app/PomofreeApp";
+---
+
+<Layout title="Pomofree | 集中タイマー" description="Pomofreeの集中タイマー。作業と休憩を管理し、無料で統計・同期・アンビエントサウンドを利用できます。">
+  <div id="app-root">
+    <PomofreeApp client:load />
+  </div>
+</Layout>

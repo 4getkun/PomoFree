@@ -1,0 +1,47 @@
+---
+import "../styles/global.css";
+import { BASE_URL } from "../app/lib/base";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const {
+  title,
+  description = "Pomofree is a free, no-account, no-ads Pomodoro focus timer with unlimited stats, cross-device sync, ambient sounds, themes, and fully custom timer durations.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href={`${BASE_URL}favicon.svg`} />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <script is:inline>
+      // Applied before first paint to avoid a flash of the wrong theme.
+      // Mirrors the logic in src/app/lib/useSettings.ts — kept inline (not
+      // imported) so it can run synchronously ahead of hydration.
+      (function () {
+        try {
+          var raw = localStorage.getItem("pomofree:settings");
+          var theme = raw ? JSON.parse(raw).theme : "system";
+          var isDark =
+            theme === "dark" ||
+            (theme !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", isDark);
+        } catch (e) {
+          // ignore — default light theme
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

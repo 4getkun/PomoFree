@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode (`.dark` on <html>) instead of the v4 default
+   media-query-based dark mode, since Settings lets the user force light/dark. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ */
+/* Design tokens                                                      */
+/*                                                                    */
+/* Pomofree is a focus tool, not an editorial/marketing site, so the  */
+/* palette stays calm and low-contrast-but-legible: a soft teal accent*/
+/* on warm neutral surfaces. Every component should reference these   */
+/* custom properties (var(--x)) rather than hard-coded colors so the  */
+/* whole app can be retinted from this one file.                     */
+/* ------------------------------------------------------------------ */
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --text: #1f2a28;
+  --text-muted: #5f6c69;
+  --border: #e2e0da;
+  --accent: #0f8b7f;
+  --accent-hover: #0c6f65;
+  --accent-contrast: #ffffff;
+  --danger: #c15b4a;
+  --success: #3f9142;
+  --ring: rgb(15 139 127 / 35%);
+  --shadow-color: 220 20% 40%;
+
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #12181a;
+  --surface: #1a2224;
+  --surface-raised: #202b2d;
+  --text: #eef2f1;
+  --text-muted: #9caaa7;
+  --border: #2b3638;
+  --accent: #3fbfae;
+  --accent-hover: #5fd0c1;
+  --accent-contrast: #08201d;
+  --danger: #e08a76;
+  --success: #7cc57f;
+  --ring: rgb(63 191 174 / 35%);
+  --shadow-color: 220 40% 2%;
+
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP",
+    Meiryo,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+::selection {
+  background-color: var(--ring);
+}
+
+/* Focus ring consistent across the app */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

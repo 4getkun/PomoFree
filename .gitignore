@@ -1,0 +1,18 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+
+# environment (contains Supabase keys if sync is configured locally)
+.env
+.env.production
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.DS_Store

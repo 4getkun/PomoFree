@@ -1,0 +1,73 @@
+name: Build and deploy to GitHub Pages
+
+# 実行タイミング:
+#  - master への push(コード変更時)
+#  - 手動実行(workflow_dispatch)
+#
+# 注意: このリポジトリのデフォルトブランチはmasterのため、mainではなくmaster
+# を対象にしている。あわせてリポジトリの Settings → Environments →
+# github-pages → Deployment branches and tags で master からのデプロイを
+# 許可しておく必要がある(未設定だと "environment protection rules" エラーで
+# デプロイが拒否される)。
+#
+# Supabase連携(アカウント同期)について:
+#  PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY は任意設定。リポジトリの
+#  Settings → Secrets and variables → Actions で Secrets として登録すると
+#  ビルド時に埋め込まれ、同期機能が有効になる。未設定のままでも問題なく
+#  ビルド・デプロイでき、その場合はアプリ側が同期機能を静かに無効化する
+#  (README参照)。
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Astro 7 は Node.js 22.12.0 以上が必須(20系はビルド時にエラーになる)
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build site
+        run: npm run build
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,113 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { BASE_URL } from "../app/lib/base";
+
+const appUrl = `${BASE_URL}app/`;
+
+const features = [
+  {
+    title: "無制限の履歴と詳細な統計",
+    desc: "多くのアプリでは有料プランでしか見られない、すべてのセッション履歴とグラフを無制限に。",
+  },
+  {
+    title: "端末をまたいだ同期",
+    desc: "スマホでもPCでも同じデータ。同期機能を有料の壁の向こうに置いたりしません。",
+  },
+  {
+    title: "アンビエントサウンド",
+    desc: "雨音や波音などの環境音で集中力を高めます。",
+  },
+  {
+    title: "ライト / ダークテーマ",
+    desc: "目に優しいテーマをいつでも無料で切り替え可能。",
+  },
+  {
+    title: "データのエクスポート",
+    desc: "あなたの記録はあなたのもの。いつでも取り出せます。",
+  },
+  {
+    title: "自由なタイマー設定",
+    desc: "作業時間・休憩時間・サイクル数を制限なくカスタマイズ。",
+  },
+];
+---
+
+<Layout title="Pomofree — 無料のポモドーロ集中タイマー">
+  <main style={{ backgroundColor: "var(--bg)", color: "var(--text)" }} class="min-h-screen">
+    <section class="mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 pb-16 pt-20 text-center sm:pt-28">
+      <p
+        class="rounded-full border px-4 py-1 text-xs font-medium"
+        style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+      >
+        広告なし・トラッキングなし・アカウント登録不要
+      </p>
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">
+        <span style={{ color: "var(--accent)" }}>Pomo</span>free
+      </h1>
+      <p class="max-w-xl text-lg" style={{ color: "var(--text-muted)" }}>
+        Pomofreeは無料のポモドーロ集中タイマーです。他の人気アプリが有料プランの裏に隠している機能
+        — クロスデバイス同期、詳細な統計、無制限の履歴、アンビエントサウンド、テーマ、データのエクスポート、
+        タイマー時間の自由なカスタマイズ — をすべて無料で提供します。
+      </p>
+      <a
+        href={appUrl}
+        class="mt-2 rounded-full px-8 py-3 text-base font-semibold shadow-sm transition hover:opacity-90"
+        style={{ backgroundColor: "var(--accent)", color: "var(--accent-contrast)" }}
+      >
+        今すぐ無料で始める →
+      </a>
+      <p class="text-xs" style={{ color: "var(--text-muted)" }}>
+        インストール不要・登録不要。ブラウザですぐにタイマーが使えます。
+      </p>
+    </section>
+
+    <section class="mx-auto max-w-4xl px-6 pb-16">
+      <div class="rounded-2xl border p-6 sm:p-10" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <h2 class="text-center text-2xl font-semibold">よくある「有料プラン限定」機能、Pomofreeは全部無料</h2>
+        <p class="mx-auto mt-3 max-w-2xl text-center text-sm" style={{ color: "var(--text-muted)" }}>
+          Focus To-Do、Session、Forest、Be Focused、Flat Tomato、Focus Keeper、TickTick、Toggl
+          Trackなど人気のポモドーロアプリを調べたところ、クロスデバイス同期・詳細な統計・無制限の履歴・
+          アンビエントサウンド・テーマ／ダークモード・データエクスポート・カレンダー連携・タイマー時間の自由な変更
+          といった機能は有料プランでしか使えないことがほとんどでした。Pomofreeはこれらをすべて無料で提供します。
+        </p>
+        <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {
+            features.map((f) => (
+              <div class="flex flex-col gap-1 rounded-xl border p-4" style={{ borderColor: "var(--border)" }}>
+                <span class="text-sm font-semibold" style={{ color: "var(--accent)" }}>
+                  無料
+                </span>
+                <h3 class="font-medium">{f.title}</h3>
+                <p class="text-sm" style={{ color: "var(--text-muted)" }}>
+                  {f.desc}
+                </p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="mx-auto max-w-3xl px-6 pb-16 text-center">
+      <h2 class="text-2xl font-semibold">広告なし。トラッキングなし。</h2>
+      <p class="mx-auto mt-3 max-w-xl text-sm" style={{ color: "var(--text-muted)" }}>
+        Pomofreeに広告は表示されません。行動を追跡する分析ツールも組み込んでいません。あなたのタイマー、
+        あなたのデータです。集中したい人のための、静かで邪魔をしないツールを目指しています。
+      </p>
+    </section>
+
+    <section class="mx-auto max-w-2xl px-6 pb-24 text-center">
+      <a
+        href={appUrl}
+        class="inline-block rounded-full px-8 py-3 text-base font-semibold shadow-sm transition hover:opacity-90"
+        style={{ backgroundColor: "var(--accent)", color: "var(--accent-contrast)" }}
+      >
+        Pomofreeを開く →
+      </a>
+    </section>
+
+    <footer class="border-t px-6 py-8 text-center text-xs" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+      <p>Pomofree — 無料のポモドーロ集中タイマー。広告なし、トラッキングなし。</p>
+    </footer>
+  </main>
+</Layout>
