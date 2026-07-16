@@ -121,4 +121,18 @@ export interface PomodoroSession {
   durationMinutes: number;
   /** false if the session was skipped/cancelled before its natural end. */
   completed: boolean;
+  /**
+   * True for an incremental record flushed while a work phase was paused
+   * (see useTimerEngine's pause() in timer.ts), rather than the record
+   * created when the phase actually finishes (skip or natural end). Lets
+   * stats.ts credit this genuinely-elapsed time toward focus-time totals,
+   * daily/streak/heatmap data, and project breakdowns immediately — instead
+   * of only once the phase eventually finishes, which could be much later
+   * or never if the user resumes on a different day. Deliberately does NOT
+   * count toward completed-session/skip counts or the completion rate —
+   * those still come only from the true finish-time record, so pausing
+   * mid-session several times doesn't fabricate extra "completed pomodoros".
+   * Absent/false for every pre-existing record and for break-type sessions.
+   */
+  partial?: boolean;
 }

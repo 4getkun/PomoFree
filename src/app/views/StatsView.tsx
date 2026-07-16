@@ -15,7 +15,14 @@ type RangeMode = "daily" | "weekly" | "monthly";
 
 const RANGE_LABEL: Record<RangeMode, string> = { daily: "日別", weekly: "週別", monthly: "月別" };
 
-function formatMinutes(total: number): string {
+function formatMinutes(rawTotal: number): string {
+  // Session durations can now be fractional minutes (pause-time flushing —
+  // see timer.ts — records down to the second, e.g. 2 seconds = 0.0333...
+  // minutes), so this always rounds to a whole minute before splitting into
+  // hours/minutes — otherwise a raw float like "0.0833...分" would leak
+  // into the UI instead of a clean "5秒" — worthy of note but out of scope;
+  // rounding to the nearest whole minute keeps this display simple.
+  const total = Math.round(rawTotal);
   const h = Math.floor(total / 60);
   const m = total % 60;
   if (h === 0) return `${m}分`;
@@ -176,7 +183,8 @@ export default function StatsView() {
 
           {summary.skippedWorkSessions > 0 && (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              参考: これまでに {summary.skippedWorkSessions} 回の作業セッションがスキップされています（上記の合計には含まれていません）。
+              参考: これまでに {summary.skippedWorkSessions}{" "}
+              回の作業セッションが最後まで完了せずスキップされています。一時停止した時点までの時間は上記の合計フォーカス時間に含まれていますが、スキップした残りの時間は含まれていません。
             </p>
           )}
         </>

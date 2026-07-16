@@ -7,7 +7,7 @@
 // only controls display smoothness, never the countdown math itself.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Settings, PomodoroSession, SessionType } from "./types";
+import type { Settings, SessionType } from "./types";
 import { appendSession } from "./storage";
 
 export type TimerPhase = "work" | "shortBreak" | "longBreak";
@@ -117,6 +117,13 @@ export function useTimerEngine(settings: Settings, callbacks?: TimerEngineCallba
 
   const phaseEndAtRef = useRef<number | null>(null);
   const phaseStartedAtRef = useRef<string | null>(null);
+  // How much of the CURRENT phase attempt has already been flushed to
+  // storage as a focus-time record (see pause()/finishPhase() below), and
+  // when that last flush happened. Lets each flush record only the NEW
+  // slice since the previous one, instead of double-counting time that was
+  // already recorded at an earlier pause.
+  const flushedMsRef = useRef<number>(0);
+  const lastFlushAtRef = useRef<string | null>(null);
 
   // Keep the displayed duration in sync with Settings edits made while the
   // timer is idle (e.g. user changes work length before starting).
@@ -139,16 +146,43 @@ export function useTimerEngine(settings: Settings, callbacks?: TimerEngineCallba
       // "work done on" anything.
       const taskId = prev.phase === "work" ? activeTaskIdRef.current : null;
 
-      const session: PomodoroSession = {
-        id: makeId(),
-        taskId,
-        type: phaseToSessionType(prev.phase),
-        startedAt,
-        endedAt: new Date(now).toISOString(),
-        durationMinutes: phaseDurationMinutes(prev.phase, settingsRef.current),
-        completed: wasCompleted,
-      };
-      appendSession(session);
+      if (prev.phase === "work") {
+        // Work phases are flushed incrementally on every pause() (below),
+        // so this only needs to record whatever slice hasn't been flushed
+        // yet — the time since the last pause, or the whole phase if it was
+        // never paused. A session that finishes without ever pausing still
+        // produces exactly one record covering its full elapsed time, same
+        // as before this change. Always appended (even if the unflushed
+        // remainder rounds to 0 seconds, e.g. skip called immediately after
+        // a pause) so totalCompletedSessions/completionRate still get
+        // exactly one record per real attempt, regardless of how many
+        // times it was paused along the way.
+        const elapsedMs = Math.max(0, prev.totalMs - prev.remainingMs);
+        const unflushedSeconds = Math.round(Math.max(0, elapsedMs - flushedMsRef.current) / 1000);
+        appendSession({
+          id: makeId(),
+          taskId,
+          type: "work",
+          startedAt: lastFlushAtRef.current ?? startedAt,
+          endedAt: new Date(now).toISOString(),
+          durationMinutes: unflushedSeconds / 60,
+          completed: wasCompleted,
+        });
+      } else {
+        // Breaks aren't flushed incrementally — focus-time stats only track
+        // work phases — so record the whole break in one go, as before.
+        appendSession({
+          id: makeId(),
+          taskId: null,
+          type: phaseToSessionType(prev.phase),
+          startedAt,
+          endedAt: new Date(now).toISOString(),
+          durationMinutes: phaseDurationMinutes(prev.phase, settingsRef.current),
+          completed: wasCompleted,
+        });
+      }
+      flushedMsRef.current = 0;
+      lastFlushAtRef.current = null;
 
       // A pomodoro only "counts" toward a task's progress if the work phase
       // ran to completion (skipped sessions don't increment it).
@@ -216,6 +250,34 @@ export function useTimerEngine(settings: Settings, callbacks?: TimerEngineCallba
       const endAt = phaseEndAtRef.current;
       const remaining = endAt != null ? Math.max(0, endAt - Date.now()) : prev.remainingMs;
       phaseEndAtRef.current = null;
+
+      // Flush elapsed work time to stats immediately, instead of waiting
+      // for the phase to fully finish — a work session paused and picked
+      // back up on a later day (or never resumed at all) would otherwise
+      // show zero focus time until/unless it's eventually completed or
+      // skipped. Rounds down to whole seconds; any leftover fraction under
+      // 1 second just carries forward and gets picked up by the next flush
+      // (pause or finish) rather than being dropped.
+      if (prev.phase === "work") {
+        const now = Date.now();
+        const elapsedMs = Math.max(0, prev.totalMs - remaining);
+        const deltaSeconds = Math.round(Math.max(0, elapsedMs - flushedMsRef.current) / 1000);
+        if (deltaSeconds > 0) {
+          appendSession({
+            id: makeId(),
+            taskId: activeTaskIdRef.current,
+            type: "work",
+            startedAt: lastFlushAtRef.current ?? phaseStartedAtRef.current ?? new Date(now - elapsedMs).toISOString(),
+            endedAt: new Date(now).toISOString(),
+            durationMinutes: deltaSeconds / 60,
+            completed: false,
+            partial: true,
+          });
+          flushedMsRef.current += deltaSeconds * 1000;
+          lastFlushAtRef.current = new Date(now).toISOString();
+        }
+      }
+
       return { ...prev, status: "paused", remainingMs: remaining };
     });
   }, []);
@@ -228,6 +290,12 @@ export function useTimerEngine(settings: Settings, callbacks?: TimerEngineCallba
     setState((prev) => {
       phaseEndAtRef.current = null;
       phaseStartedAtRef.current = null;
+      // Chunks already flushed by an earlier pause (see pause() above) stay
+      // recorded permanently — reset() only discards the *unflushed*
+      // remainder of this attempt, consistent with reset() never having
+      // recorded anything for a never-paused session either.
+      flushedMsRef.current = 0;
+      lastFlushAtRef.current = null;
       const totalMs = phaseDurationMinutes(prev.phase, settingsRef.current) * 60_000;
       return { ...prev, status: "idle", remainingMs: totalMs, totalMs };
     });

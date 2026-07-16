@@ -13,9 +13,17 @@ export interface DailyFocus {
   sessionCount: number;
 }
 
-/** "Real" focus time: completed (not skipped) work-type sessions. */
+/**
+ * "Real" focus time: fully-completed work-type sessions, plus `partial`
+ * chunks flushed while a work phase was paused (see useTimerEngine's
+ * pause() in timer.ts). Both represent genuinely-elapsed focus time —
+ * they're just recorded at different moments, so a session paused and
+ * picked up again later (or never) still counts the time already spent.
+ * Time left unflushed at the moment of an explicit skip is intentionally
+ * still excluded (see the skip note in StatsView).
+ */
 export function completedWorkSessions(sessions: PomodoroSession[]): PomodoroSession[] {
-  return sessions.filter((s) => s.type === "work" && s.completed);
+  return sessions.filter((s) => s.type === "work" && (s.completed || s.partial));
 }
 
 export function toLocalDateKey(iso: string): string {
@@ -243,9 +251,17 @@ export interface SummaryStats {
 }
 
 export function computeSummary(sessions: PomodoroSession[]): SummaryStats {
-  const workSessions = sessions.filter((s) => s.type === "work");
+  // Completed-session/skip counts and the completion rate are about real
+  // phase ATTEMPTS, so `partial` pause-flush chunks (see
+  // completedWorkSessions() above) are deliberately excluded here — a work
+  // phase paused three times before finishing is still exactly one
+  // attempt, not four.
+  const workSessions = sessions.filter((s) => s.type === "work" && !s.partial);
   const completed = workSessions.filter((s) => s.completed);
-  const totalFocusMinutes = completed.reduce((sum, s) => sum + s.durationMinutes, 0);
+  // totalFocusMinutes, on the other hand, should reflect every second
+  // actually spent focused — including partial chunks — so it uses the
+  // broader completedWorkSessions() set.
+  const totalFocusMinutes = completedWorkSessions(sessions).reduce((sum, s) => sum + s.durationMinutes, 0);
   return {
     totalFocusMinutes,
     totalCompletedSessions: completed.length,

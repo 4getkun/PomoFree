@@ -68,11 +68,15 @@ export function exportSessionsAsCSV(): void {
   const rows = sessions.map((s) => {
     const task = s.taskId ? taskById.get(s.taskId) : undefined;
     const project = task?.projectId ? projectById.get(task.projectId) : undefined;
+    // `partial` rows are incremental chunks flushed while paused (see
+    // timer.ts), not a full phase attempt — labeled distinctly so they
+    // aren't misread as either a completed pomodoro or a skipped one.
+    const statusLabel = s.partial ? "一時停止時点の記録" : s.completed ? "完了" : "スキップ";
     return [
       s.startedAt,
       s.endedAt,
       SESSION_TYPE_LABEL[s.type] ?? s.type,
-      s.completed ? "完了" : "スキップ",
+      statusLabel,
       s.durationMinutes,
       task?.title ?? "",
       project?.name ?? "",
