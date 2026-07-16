@@ -1,12 +1,27 @@
 import { useMemo, useState } from "react";
 import type { Project, RecurrenceFrequency, Task, TaskPriority } from "../lib/types";
-import { useTasks, type NewTaskInput } from "../lib/useTasks";
+import type { NewTaskInput } from "../lib/useTasks";
 import { useProjects } from "../lib/useProjects";
 import { compareTasks, todayLocalISODate } from "../lib/tasks";
 
+// Task data/CRUD is owned by PomofreeApp.tsx (not this view) and passed in
+// as props — see the hoisting note there. TimerView also needs the same
+// task list (for its active-task dropdown), so a single shared useTasks()
+// instance at the root avoids two independently-diverging in-memory copies
+// of the same localStorage-backed array. useProjects() stays local here
+// since TimerView never needs project data.
 interface TasksViewProps {
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
+  tasks: Task[];
+  addTask: (input: NewTaskInput) => string;
+  updateTask: (id: string, patch: Partial<Task>) => void;
+  deleteTask: (id: string) => void;
+  toggleComplete: (id: string) => void;
+  addSubtask: (taskId: string, title: string) => void;
+  removeSubtask: (taskId: string, subtaskId: string) => void;
+  toggleSubtask: (taskId: string, subtaskId: string) => void;
+  clearProjectReferences: (projectId: string) => void;
 }
 
 // Fixed-order categorical swatches (dataviz-skill-validated 8-hue set —
@@ -31,18 +46,19 @@ const RECURRENCE_LABEL: Record<RecurrenceFrequency, string> = { none: "繰り返
 
 type ProjectFilter = "all" | "none" | string;
 
-export default function TasksView({ activeTaskId, setActiveTaskId }: TasksViewProps) {
-  const {
-    tasks,
-    addTask,
-    updateTask,
-    deleteTask,
-    toggleComplete,
-    addSubtask,
-    removeSubtask,
-    toggleSubtask,
-    clearProjectReferences,
-  } = useTasks();
+export default function TasksView({
+  activeTaskId,
+  setActiveTaskId,
+  tasks,
+  addTask,
+  updateTask,
+  deleteTask,
+  toggleComplete,
+  addSubtask,
+  removeSubtask,
+  toggleSubtask,
+  clearProjectReferences,
+}: TasksViewProps) {
   const { projects, addProject, updateProject, setArchived, deleteProject } = useProjects();
 
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");

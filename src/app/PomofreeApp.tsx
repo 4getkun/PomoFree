@@ -1,7 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSettings } from "./lib/useSettings";
 import { useActiveTask } from "./lib/useActiveTask";
 import { useSync } from "./lib/useSync";
+import { useTasks } from "./lib/useTasks";
+import { useTimerEngine, type PhaseEndEvent } from "./lib/timer";
+import { isAmbientSoundId } from "./lib/types";
+import { createAmbientSoundEngine, type AmbientSoundEngine } from "./lib/ambientSound";
+import { playChime } from "./lib/sound";
+import { formatMMSS, PHASE_LABEL, notificationCopy } from "./lib/timerDisplay";
 import { BASE_URL } from "./lib/base";
 import { shouldIgnoreShortcut } from "./lib/keyboard";
 import TimerView from "./views/TimerView";
@@ -88,6 +94,107 @@ export default function PomofreeApp() {
   // are hoisted here rather than into the views that display them.
   const sync = useSync();
 
+  // Task data lives here (not inside TasksView) for the same reason the
+  // timer engine below does: TimerView's active-task dropdown/progress
+  // display needs it too, and a single shared instance avoids two
+  // independently-diverging in-memory copies of the same localStorage-backed
+  // array.
+  const tasks = useTasks();
+
+  // --- Timer engine: hoisted from TimerView -------------------------------
+  // Originally `useTimerEngine` (plus the ambient sound engine, the chime/
+  // notification handler, and the document-title effect) lived inside
+  // TimerView. Since PomofreeApp only *conditionally renders* TimerView
+  // (`{activeView === "timer" && <TimerView .../>}`), switching to another
+  // tab unmounted TimerView entirely — destroying the timer's state (and,
+  // if paused mid-session, silently dropping it without ever recording it
+  // to stats). Hoisting everything here, to the always-mounted root,
+  // mirrors the pattern already used by useSettings/useActiveTask/useSync
+  // above: state that must survive a tab switch is owned by the component
+  // that never unmounts.
+  const handlePhaseEnd = useCallback(
+    (event: PhaseEndEvent) => {
+      // Always play the synthesized chime as immediate feedback.
+      playChime(settings.soundVolume);
+
+      // Only fire a browser notification if the user opted in AND the page
+      // currently lacks focus (otherwise the audible chime is enough).
+      if (
+        settings.notificationsEnabled &&
+        typeof window !== "undefined" &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted" &&
+        !document.hasFocus()
+      ) {
+        const { title, body } = notificationCopy(event);
+        try {
+          new Notification(title, { body, icon: `${BASE_URL}favicon.svg` });
+        } catch {
+          // Notification construction can throw in some environments — ignore.
+        }
+      }
+    },
+    [settings.soundVolume, settings.notificationsEnabled],
+  );
+
+  const timer = useTimerEngine(settings, {
+    onPhaseEnd: handlePhaseEnd,
+    activeTaskId,
+    onWorkSessionComplete: tasks.incrementCompletedPomodoros,
+  });
+  const { phase, status, remainingMs } = timer;
+
+  const originalTitleRef = useRef<string | null>(null);
+
+  // One ambient-sound engine for the whole app lifetime (was previously
+  // created/disposed on every TimerView mount/unmount).
+  const soundEngineRef = useRef<AmbientSoundEngine | null>(null);
+  useEffect(() => {
+    soundEngineRef.current = createAmbientSoundEngine();
+    return () => {
+      soundEngineRef.current?.dispose();
+      soundEngineRef.current = null;
+    };
+  }, []);
+
+  // Ambient sound only plays during an actively-running work phase — paused,
+  // on break, or soundId === null all stop it (with a short fade, handled
+  // inside the engine).
+  useEffect(() => {
+    const engine = soundEngineRef.current;
+    if (!engine) return;
+    const shouldPlay = phase === "work" && status === "running" && isAmbientSoundId(settings.soundId);
+    if (shouldPlay && isAmbientSoundId(settings.soundId)) {
+      engine.play(settings.soundId, settings.soundVolume);
+    } else {
+      engine.stop();
+    }
+    // settings.soundVolume intentionally excluded — live volume changes are
+    // handled by the effect below instead of restarting the sound.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, status, settings.soundId]);
+
+  // Live volume updates while a sound is already playing (e.g. the user
+  // adjusts the slider in Settings mid-session) without restarting it.
+  useEffect(() => {
+    soundEngineRef.current?.setVolume(settings.soundVolume);
+  }, [settings.soundVolume]);
+
+  // Reflect the running countdown in the document title so it's visible
+  // from a background tab, regardless of which in-app tab is active.
+  useEffect(() => {
+    if (originalTitleRef.current == null) {
+      originalTitleRef.current = document.title;
+    }
+    if (status === "running" || status === "paused") {
+      const suffix = status === "paused" ? "一時停止" : PHASE_LABEL[phase];
+      document.title = `${formatMMSS(remainingMs)} - ${suffix} | Pomofree`;
+    } else {
+      document.title = originalTitleRef.current ?? "Pomofree";
+    }
+  }, [remainingMs, status, phase]);
+  // -------------------------------------------------------------------------
+
   // Global tab-switch shortcuts (1-4). Timer-control shortcuts (Space/S/R)
   // live inside TimerView itself since they only make sense while that tab
   // is showing; see the guard in lib/keyboard.ts for why typing in a field
@@ -143,9 +250,29 @@ export default function PomofreeApp() {
             {VIEW_TITLE[activeView]}
           </h1>
           {activeView === "timer" && (
-            <TimerView settings={settings} activeTaskId={activeTaskId} setActiveTaskId={setActiveTaskId} />
+            <TimerView
+              settings={settings}
+              activeTaskId={activeTaskId}
+              setActiveTaskId={setActiveTaskId}
+              tasks={tasks.tasks}
+              timer={timer}
+            />
           )}
-          {activeView === "tasks" && <TasksView activeTaskId={activeTaskId} setActiveTaskId={setActiveTaskId} />}
+          {activeView === "tasks" && (
+            <TasksView
+              activeTaskId={activeTaskId}
+              setActiveTaskId={setActiveTaskId}
+              tasks={tasks.tasks}
+              addTask={tasks.addTask}
+              updateTask={tasks.updateTask}
+              deleteTask={tasks.deleteTask}
+              toggleComplete={tasks.toggleComplete}
+              addSubtask={tasks.addSubtask}
+              removeSubtask={tasks.removeSubtask}
+              toggleSubtask={tasks.toggleSubtask}
+              clearProjectReferences={tasks.clearProjectReferences}
+            />
+          )}
           {activeView === "stats" && <StatsView />}
           {activeView === "settings" && (
             <SettingsView

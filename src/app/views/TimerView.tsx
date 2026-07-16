@@ -1,24 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { Settings } from "../lib/types";
-import { isAmbientSoundId } from "../lib/types";
-import { useTimerEngine, type PhaseEndEvent, type TimerPhase } from "../lib/timer";
-import { playChime } from "../lib/sound";
-import { createAmbientSoundEngine, type AmbientSoundEngine } from "../lib/ambientSound";
-import { useTasks } from "../lib/useTasks";
-import { BASE_URL } from "../lib/base";
+import { useEffect, useMemo } from "react";
+import type { Settings, Task } from "../lib/types";
+import type { TimerEngine, TimerPhase } from "../lib/timer";
+import { PHASE_LABEL, formatMMSS } from "../lib/timerDisplay";
 import { shouldIgnoreShortcut } from "../lib/keyboard";
 
+// The timer engine itself (plus the ambient sound engine, chime/notification
+// handling, and the document-title effect) lives in PomofreeApp.tsx, not
+// here — see the hoisting note there. This component only renders the
+// engine's current state and forwards user actions to it, so switching away
+// from this tab and back never resets anything: the state it displays was
+// never owned by this component in the first place.
 interface TimerViewProps {
   settings: Settings;
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
+  tasks: Task[];
+  timer: TimerEngine;
 }
-
-const PHASE_LABEL: Record<TimerPhase, string> = {
-  work: "作業中",
-  shortBreak: "短い休憩",
-  longBreak: "長い休憩",
-};
 
 const PHASE_LABEL_SHORT: Record<TimerPhase, string> = {
   work: "作業",
@@ -26,115 +24,11 @@ const PHASE_LABEL_SHORT: Record<TimerPhase, string> = {
   longBreak: "長休憩",
 };
 
-function formatMMSS(ms: number): string {
-  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function notificationCopy(event: PhaseEndEvent): { title: string; body: string } {
-  if (event.endedPhase === "work") {
-    return {
-      title: "作業セッション終了",
-      body: event.nextPhase === "longBreak" ? "お疲れさまでした。長い休憩を取りましょう。" : "お疲れさまでした。少し休憩しましょう。",
-    };
-  }
-  return {
-    title: event.endedPhase === "longBreak" ? "長い休憩終了" : "休憩終了",
-    body: "次の作業セッションを始めましょう。",
-  };
-}
-
-export default function TimerView({ settings, activeTaskId, setActiveTaskId }: TimerViewProps) {
-  const { tasks, incrementCompletedPomodoros } = useTasks();
+export default function TimerView({ settings, activeTaskId, setActiveTaskId, tasks, timer }: TimerViewProps) {
   const selectableTasks = useMemo(() => tasks.filter((t) => !t.completed), [tasks]);
   const activeTask = useMemo(() => tasks.find((t) => t.id === activeTaskId) ?? null, [tasks, activeTaskId]);
 
-  const handlePhaseEnd = useCallback(
-    (event: PhaseEndEvent) => {
-      // Always play the synthesized chime as immediate feedback.
-      playChime(settings.soundVolume);
-
-      // Only fire a browser notification if the user opted in AND the page
-      // currently lacks focus (otherwise the audible chime is enough).
-      if (
-        settings.notificationsEnabled &&
-        typeof window !== "undefined" &&
-        typeof Notification !== "undefined" &&
-        Notification.permission === "granted" &&
-        !document.hasFocus()
-      ) {
-        const { title, body } = notificationCopy(event);
-        try {
-          new Notification(title, { body, icon: `${BASE_URL}favicon.svg` });
-        } catch {
-          // Notification construction can throw in some environments — ignore.
-        }
-      }
-    },
-    [settings.soundVolume, settings.notificationsEnabled],
-  );
-
-  const timer = useTimerEngine(settings, {
-    onPhaseEnd: handlePhaseEnd,
-    activeTaskId,
-    onWorkSessionComplete: incrementCompletedPomodoros,
-  });
   const { phase, status, remainingMs, totalMs, completedWorkSessions, start, pause, skip, reset } = timer;
-
-  const originalTitleRef = useRef<string | null>(null);
-
-  // One ambient-sound engine per mount, torn down on unmount so its
-  // AudioContext (and any scheduled noise-transient timers) don't leak.
-  const soundEngineRef = useRef<AmbientSoundEngine | null>(null);
-  useEffect(() => {
-    soundEngineRef.current = createAmbientSoundEngine();
-    return () => {
-      soundEngineRef.current?.dispose();
-      soundEngineRef.current = null;
-    };
-  }, []);
-
-  // Ambient sound only plays during an actively-running work phase — paused,
-  // on break, or soundId === null all stop it (with a short fade, handled
-  // inside the engine).
-  useEffect(() => {
-    const engine = soundEngineRef.current;
-    if (!engine) return;
-    const shouldPlay = phase === "work" && status === "running" && isAmbientSoundId(settings.soundId);
-    if (shouldPlay && isAmbientSoundId(settings.soundId)) {
-      engine.play(settings.soundId, settings.soundVolume);
-    } else {
-      engine.stop();
-    }
-    // settings.soundVolume intentionally excluded — live volume changes are
-    // handled by the effect below instead of restarting the sound.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, status, settings.soundId]);
-
-  // Live volume updates while a sound is already playing (e.g. the user
-  // adjusts the slider in Settings mid-session) without restarting it.
-  useEffect(() => {
-    soundEngineRef.current?.setVolume(settings.soundVolume);
-  }, [settings.soundVolume]);
-
-  // Reflect the running countdown in the document title so it's visible
-  // from a background tab.
-  useEffect(() => {
-    if (originalTitleRef.current == null) {
-      originalTitleRef.current = document.title;
-    }
-    if (status === "running" || status === "paused") {
-      const suffix = status === "paused" ? "一時停止" : PHASE_LABEL[phase];
-      document.title = `${formatMMSS(remainingMs)} - ${suffix} | Pomofree`;
-    } else {
-      document.title = originalTitleRef.current ?? "Pomofree";
-    }
-    return () => {
-      if (originalTitleRef.current) document.title = originalTitleRef.current;
-    };
-  }, [remainingMs, status, phase]);
 
   // Keyboard shortcuts, active only while the Timer tab is mounted: Space
   // starts/pauses, S skips, R resets. Disabled while typing in any field
