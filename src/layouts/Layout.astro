@@ -22,10 +22,9 @@ const {
   url = "",
 } = Astro.props;
 
-// Astro.site is the origin only ("https://4getkun.github.io/"), so BASE_URL
-// (which already carries the "/PomoFree/" repo-name prefix) has to be
-// folded in here to get the real absolute URL — see astro.config.mjs's
-// base-path comment for why that prefix exists at all.
+// Astro.site is the origin only ("https://fourgetkun.com/"), so BASE_URL
+// (which already carries the "/pomofree/" prefix) has to be folded in here
+// to get the real absolute URL — see astro.config.mjs for why the prefix exists.
 const ogImageAbsoluteUrl = new URL(`${BASE_URL}${image}`, Astro.site).toString();
 const canonicalAbsoluteUrl = new URL(`${BASE_URL}${url}`, Astro.site).toString();
 ---
@@ -40,6 +39,89 @@ const canonicalAbsoluteUrl = new URL(`${BASE_URL}${url}`, Astro.site).toString()
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <link rel="canonical" href={canonicalAbsoluteUrl} />
+    <script is:inline>
+      // 引っ越し（4getkun.github.io/PomoFree/ → fourgetkun.com/pomofree/）。
+      //
+      // データは localStorage にあり、localStorage はドメインごとに別。何もしないと、
+      // 旧 URL で使っていた人のタスク・履歴・設定が新 URL から見えなくなる。
+      //   旧 URL で開かれたら: "pomofree:" で始まる値をまとめて圧縮し、URL の # 以降に載せて新 URL へ送る
+      //   新 URL で # を受け取ったら: 新 URL にまだデータが無いときだけ書き込み、# を消して読み込み直す
+      // # 以降はサーバーへ送られないので、データはどこのサーバーにも渡らない（取り次ぎのハブにも）。
+      // Supabase のログイン情報（sb-*）は URL に載せない。同期している人は新 URL でログインし直す。
+      (function () {
+        var OLD_HOST = "4getkun.github.io";
+        var NEW_BASE = "https://fourgetkun.com/pomofree/";
+        var TAG = "#pf-migrate=";
+        var MAX = 1500000; // これより長い URL はブラウザによって切られる
+
+        function b64url(bytes) {
+          var s = "";
+          for (var i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+          return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        }
+        function unb64url(str) {
+          var s = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+          var out = new Uint8Array(s.length);
+          for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+          return out;
+        }
+        async function pipe(bytes, stream) {
+          var res = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+          return new Uint8Array(await res.arrayBuffer());
+        }
+        function collect() {
+          var data = {};
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf("pomofree:") === 0) data[k] = localStorage.getItem(k);
+          }
+          return data;
+        }
+        async function pack(data) {
+          var json = new TextEncoder().encode(JSON.stringify(data));
+          if (typeof CompressionStream === "function") return "z." + b64url(await pipe(json, new CompressionStream("deflate-raw")));
+          return "j." + b64url(json);
+        }
+        async function unpack(str) {
+          var bytes = unb64url(str.slice(2));
+          if (str.indexOf("z.") === 0) bytes = await pipe(bytes, new DecompressionStream("deflate-raw"));
+          return JSON.parse(new TextDecoder().decode(bytes));
+        }
+        window.__pomofreeMigrate = { pack: pack, unpack: unpack, collect: collect };
+
+        if (location.hostname === OLD_HOST) {
+          document.documentElement.style.visibility = "hidden";
+          var rest = location.pathname.replace(/^\/PomoFree\/?/i, "") + location.search;
+          var go = function (hash) { location.replace(NEW_BASE + rest + (hash || "")); };
+          try {
+            var data = collect();
+            if (!Object.keys(data).length) return go("");
+            pack(data).then(function (packed) {
+              go(packed.length <= MAX ? TAG + packed : TAG + "too-large");
+            }, function () { go(""); });
+          } catch (e) { go(""); }
+          return;
+        }
+
+        if (location.hash.indexOf(TAG) !== 0) return;
+        var payload = location.hash.slice(TAG.length);
+        var clean = location.pathname + location.search;
+        var hasLocal = Object.keys(collect()).length > 0;
+        if (payload === "too-large" || hasLocal) {
+          // 新 URL ですでに使っているなら上書きしない
+          history.replaceState(null, "", clean);
+          return;
+        }
+        document.documentElement.style.visibility = "hidden";
+        unpack(payload).then(function (data) {
+          for (var k in data) if (k.indexOf("pomofree:") === 0) localStorage.setItem(k, data[k]);
+          location.replace(clean); // 書き込んだデータでアプリを起動し直す
+        }, function () {
+          history.replaceState(null, "", clean);
+          document.documentElement.style.visibility = "";
+        });
+      })();
+    </script>
 
     <!-- Open Graph (used by X/Twitter as a fallback, and by
          Facebook/LINE/Discord/Slack link previews) -->

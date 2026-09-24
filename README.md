@@ -1,5 +1,7 @@
 # Pomofree
 
+公開URL: https://fourgetkun.com/pomofree/ （fourgetkun.com のハブ配下。GitHub Pages は配信元で、旧URL `4getkun.github.io/PomoFree/` で開くと、端末のデータごと新URLへ移ります）
+
 有料ポモドーロアプリが課金機能にしがちな要素を、すべて無料で使えるようにしたポモドーロタイマーです。
 
 - タイマーの長さ・休憩間隔は完全に自由にカスタマイズ可能(多くのアプリは有料)
@@ -28,7 +30,7 @@ npm install
 npm run dev
 ```
 
-`http://localhost:4321/Pomofree/` で確認できます(`astro.config.mjs`の`base`設定により`/Pomofree`配下になります)。
+`http://localhost:4321/pomofree/` で確認できます(`astro.config.mjs`の`base`設定により`/pomofree`配下になります)。
 
 ```bash
 npm run build    # dist/ に静的ファイルを生成
